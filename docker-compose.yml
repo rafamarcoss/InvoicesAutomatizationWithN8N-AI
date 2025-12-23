@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # Servicio de n8n para orquestación
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: floristeria_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=floristeria2025
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - ./volumes/n8n:/home/node/.n8n
+    networks:
+      - floristeria_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Mock de IA para procesamiento de texto
+  ai-mock:
+    build:
+      context: ./ai-mock
+      dockerfile: Dockerfile
+    container_name: floristeria_ai_mock
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    networks:
+      - floristeria_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Servicio de generación de PDFs
+  pdf-service:
+    build:
+      context: ./pdf-service
+      dockerfile: Dockerfile
+    container_name: floristeria_pdf_service
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./volumes/invoices:/app/invoices
+      - ./volumes/logo.png:/app/logo.png:ro
+    networks:
+      - floristeria_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  floristeria_network:
+    driver: bridge
